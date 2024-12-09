@@ -1,24 +1,17 @@
-// Types
 interface ScreenElement {
-  type: 'screen' | 'requirement' | 'component' | 'usecase';
+  type: 'screen';
   name: string;
-  requirements?: {
-    performance?: string;
-    security?: string;
-    availability?: string;
-    usability?: string;
-  };
-  components?: {
-    type: 'text' | 'field' | 'button' | 'action';
+  components: {
+    type: 'text' | 'button' | 'action' | 'other'; // 'other' を追加
     name: string;
   }[];
-  transitions?: {
-    to: string;
-    condition?: string;
+  transitions: {
+    from: string; // アクション名
+    to: string; // 遷移先画面名
   }[];
+  sections: string[]; // セクション区切りを保持
 }
 
-// Parser
 class ScreenFlowParser {
   private screens: ScreenElement[] = [];
   private currentScreen: ScreenElement | null = null;
@@ -39,55 +32,43 @@ class ScreenFlowParser {
         this.currentScreen = {
           type: 'screen',
           name: line.slice(1, -1),
-          requirements: {},
           components: [],
           transitions: [],
+          sections: [],
         };
-      } else if (line.startsWith('//')) {
-        const [type, ...description] = line.slice(2).split(':');
-        if (this.currentScreen && this.currentScreen.requirements) {
-          switch (type.trim()) {
-            case 'P':
-              this.currentScreen.requirements.performance = description.join(':').trim();
-              break;
-            case 'S':
-              this.currentScreen.requirements.security = description.join(':').trim();
-              break;
-            case 'A':
-              this.currentScreen.requirements.availability = description.join(':').trim();
-              break;
-            case 'U':
-              this.currentScreen.requirements.usability = description.join(':').trim();
-              break;
-          }
+      } else if (line === '--') {
+        // セクション区切りを追加
+        if (this.currentScreen) {
+          this.currentScreen.sections.push(line);
+        }
+      } else if (line.includes('=>')) {
+        // 画面遷移の処理
+        if (this.currentScreen) {
+          const [action, target] = line.split('=>').map((s) => s.trim());
+          const actionName = action.slice(2); // 'A ' を除去
+          this.currentScreen.transitions.push({
+            from: actionName,
+            to: target,
+          });
+          // アクションも通常のコンポーネントとして追加
+          this.currentScreen.components.push({
+            type: 'action',
+            name: actionName,
+          });
         }
       } else if (
         line.startsWith('T ') ||
-        line.startsWith('E ') ||
         line.startsWith('B ') ||
-        line.startsWith('A ')
+        line.startsWith('A ') ||
+        line.startsWith('O ')
       ) {
-        const type = line[0];
-        const name = line.slice(2);
         if (this.currentScreen) {
-          this.currentScreen.components!.push({
+          const type = line[0];
+          const name = line.slice(2);
+          this.currentScreen.components.push({
             type:
-              type === 'T' ? 'text' : type === 'E' ? 'field' : type === 'B' ? 'button' : 'action',
-            name,
-          });
-        }
-      } else if (line.startsWith('=>')) {
-        if (this.currentScreen) {
-          this.currentScreen.transitions!.push({
-            to: line.slice(2).trim(),
-          });
-        }
-      } else if (line.startsWith('={')) {
-        const match = line.match(/={(.+)}=>(.+)/);
-        if (match && this.currentScreen) {
-          this.currentScreen.transitions!.push({
-            to: match[2].trim(),
-            condition: match[1].trim(),
+              type === 'T' ? 'text' : type === 'B' ? 'button' : type === 'A' ? 'action' : 'other',
+            name: name,
           });
         }
       }
@@ -103,25 +84,88 @@ class ScreenFlowParser {
 
 // Renderer
 class ScreenFlowRenderer {
-  private spacing = 150;
+  private spacing = 300;
 
   constructor(private figma: PluginAPI) {}
 
+  private async createScreenNode(screen: ScreenElement, x: number, y: number): Promise<FrameNode> {
+    // フレームを作成
+    const frame = this.figma.createFrame();
+    frame.x = x;
+    frame.y = y;
+    frame.resize(250, 300);
+
+    // フレームのスタイル設定
+    frame.fills = [
+      {
+        type: 'SOLID',
+        color: { r: 1, g: 1, b: 1 }, // 白背景
+        opacity: 1,
+      },
+    ];
+
+    // テキストノードを作成
+    const textNode = this.figma.createText();
+    await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
+
+    let content = `[${screen.name}]\n\n`;
+
+    for (const component of screen.components) {
+      if (
+        screen.sections.includes('--') &&
+        component.type === 'action' &&
+        !content.endsWith('\n\n')
+      ) {
+        content += '\n';
+      }
+
+      content += `${this.getComponentPrefix(component.type)}: ${component.name}\n`;
+    }
+
+    textNode.characters = content;
+    textNode.fontSize = 12;
+
+    // テキストをフレームに追加
+    frame.appendChild(textNode);
+
+    // テキストの位置調整
+    textNode.x = 16;
+    textNode.y = 16;
+
+    return frame;
+  }
+
+  private getComponentPrefix(type: string): string {
+    switch (type) {
+      case 'text':
+        return 'T';
+      case 'button':
+        return 'B';
+      case 'action':
+        return 'A';
+      case 'other':
+        return 'O';
+      default:
+        return '?';
+    }
+  }
+
   async render(screens: ScreenElement[]) {
     try {
-      // 先にフォントを読み込む
       await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
 
-      const screenNodes = new Map<string, StickyNode>();
-      const startX = 0;
-      const startY = 0;
+      const screenNodes = new Map<string, FrameNode>();
+      const startX = 100;
+      const startY = 100;
 
       // First pass: Create all screen nodes
       for (let i = 0; i < screens.length; i++) {
         const screen = screens[i];
-        const node = await this.createScreenNode(screen, startX + i * this.spacing * 2, startY);
+        const node = await this.createScreenNode(screen, startX + i * this.spacing, startY);
         screenNodes.set(screen.name, node);
       }
+
+      // Second pass: Create connections
       for (const screen of screens) {
         const sourceNode = screenNodes.get(screen.name);
         if (!sourceNode || !screen.transitions) continue;
@@ -141,76 +185,22 @@ class ScreenFlowRenderer {
             magnet: 'AUTO',
           };
 
-          if (transition.condition) {
-            const text = this.figma.createText();
-            await figma.loadFontAsync({ family: 'Space Mono', style: 'Regular' });
-            text.characters = transition.condition;
-            text.fontSize = 12;
-            const midX = (sourceNode.x + targetNode.x) / 2;
-            const midY = (sourceNode.y + targetNode.y) / 2;
-            text.x = midX;
-            text.y = midY - 20;
-          }
+          // 遷移ラベルを作成
+          const label = this.figma.createText();
+          await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
+          label.characters = transition.from;
+          label.fontSize = 10;
+
+          const midX = (sourceNode.x + targetNode.x) / 2;
+          const midY = (sourceNode.y + targetNode.y) / 2;
+          label.x = midX - label.width / 2;
+          label.y = midY - 15;
         }
       }
     } catch (error) {
       console.error('Render error:', error);
       throw error;
     }
-  }
-
-  private async createScreenNode(screen: ScreenElement, x: number, y: number): Promise<StickyNode> {
-    try {
-      console.log('Creating screen node:', screen);
-
-      const node = this.figma.createSticky();
-      node.x = x;
-      node.y = y;
-
-      await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
-
-      let content = `[${screen.name}]\n\n`;
-
-      if (screen.requirements) {
-        if (screen.requirements.performance) {
-          content += `P: ${screen.requirements.performance}\n`;
-        }
-        if (screen.requirements.security) {
-          content += `S: ${screen.requirements.security}\n`;
-        }
-        if (screen.requirements.availability) {
-          content += `A: ${screen.requirements.availability}\n`;
-        }
-        if (screen.requirements.usability) {
-          content += `U: ${screen.requirements.usability}\n`;
-        }
-        content += '\n';
-      }
-
-      if (screen.components) {
-        for (const component of screen.components) {
-          content += `${component.type.toUpperCase()}: ${component.name}\n`;
-        }
-      }
-
-      console.log('Setting content:', content);
-      node.text.characters = content;
-
-      return node;
-    } catch (error) {
-      console.error('CreateScreenNode error:', error);
-      throw error;
-    }
-  }
-
-  private async createTransitionLabel(text: string, x: number, y: number) {
-    const textNode = this.figma.createText();
-    await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
-    textNode.characters = text;
-    textNode.fontSize = 12;
-    textNode.x = x;
-    textNode.y = y;
-    return textNode;
   }
 }
 
