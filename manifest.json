@@ -1,0 +1,16 @@
+{
+  "name": "SFML",
+  "id": "1447934054594412779",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "capabilities": ["textreview"],
+  "enablePrivatePluginApi": true,
+  "enableProposedApi": false,
+  "documentAccess": "dynamic-page",
+  "editorType": ["figma", "figjam"],
+  "networkAccess": {
+    "allowedDomains": ["none"]
+  },
+  "permissions": ["activeusers", "fileusers", "currentuser"]
+}

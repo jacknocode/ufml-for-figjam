@@ -1,0 +1,22 @@
+{
+  "name": "sfml-for-figjam",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cp src/ui.html dist/",
+    "watch": "tsc -p tsconfig.json --watch",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,html}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,html}\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.104.0",
+    "@trivago/prettier-plugin-sort-imports": "^5.2.0",
+    "@types/node": "^22.10.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  }
+}
