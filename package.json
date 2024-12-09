@@ -2,7 +2,7 @@
   "name": "sfml-for-figjam",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "code.js",
   "scripts": {
     "build": "tsc -p tsconfig.json && cp src/ui.html dist/",
     "watch": "tsc -p tsconfig.json --watch",
@@ -10,8 +10,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,html}\""
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Kazuki Ikeda",
+  "license": "MIT",
   "devDependencies": {
     "@figma/plugin-typings": "^1.104.0",
     "@trivago/prettier-plugin-sort-imports": "^5.2.0",
