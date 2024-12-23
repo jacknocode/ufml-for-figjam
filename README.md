@@ -1,4 +1,4 @@
-# FigJam Screen Flow Generator
+# FigJam User interface Flow Generator
 
 FigJamプラグインで画面遷移図を生成するためのツールです。
 
@@ -12,7 +12,7 @@ FigJamプラグインで画面遷移図を生成するためのツールです�
 
 ```bash
 git clone [リポジトリURL]
-cd sfml-for-figjam
+cd ufml-for-figjam
 ```
 
 2. 依存関係のインストール
